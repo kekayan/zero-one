@@ -1,48 +1,30 @@
-import sys
-import time
-import json
-import select
 import random
+import sys
 
-poll_obj = select.poll()
-poll_obj.register(sys.stdin, select.POLLIN)
+def main(one_data):
+    time_step = one_data[0]
+    # p_data = [time_step, p_value, q_value from one.cpp]
+    if time_step == 0:
+        p_data = [0,random.randint(0, 100), 0 ]
+    else:
+        p_data = [time_step, random.randint(0, 100), one_data[1]]
+    with open("zero.txt", "a") as f:
+        f.write(f"{time_step} {p_data[1]} {p_data[2]}\n")
+    return p_data
 
-time_step = 0
-prev_data = None
+if __name__ == "__main__":
 
-while True:
+    if len(sys.argv) != 4:
+        print("Usage: python zero.py <time_step> <value1> <value2>")
+        sys.exit(1)
+    
     try:
-        if time_step > 0:
-            # Wait for input from one.cpp for every time step except 0
-            received_data = False
-            while not received_data:
-                if poll_obj.poll(100):  # Poll with 100ms timeout
-                    p_data = sys.stdin.readline().strip()
-                    if not p_data:
-                        break
-                    
-                    values = [int(x) for x in p_data.split()]
-                    if len(values) >= 4:  # time_step + 3 values
-                        prev_data = values[1:]
-                        received_data = True
-        
-        # Generate new data
-        if time_step == 0:
-            new_data = [random.randint(0, 100) for _ in range(3)]  # Random initial values
-        else:
-            new_data = [(x + random.randint(0, 100)) % 100 for x in prev_data]
-            
-        q_data = {
-            "time_step": time_step,
-            "data": new_data
-        }
-        
-        print(json.dumps(q_data))
-        sys.stdout.flush()
-        
-        time_step += 1
-        time.sleep(0.1)
-        
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        break
+        # Convert command line arguments to integers
+        input_data = [int(arg) for arg in sys.argv[1:]]
+        result = main(input_data)
+        print(result)
+    except ValueError:
+        print("Error: All arguments must be integers")
+        sys.exit(1)
+
+
