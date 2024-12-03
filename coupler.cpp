@@ -12,27 +12,33 @@ class ProcessManager {
 private:
     pid_t process_one = -1;
     pid_t process_zero = -1;
-    int pipe_one_to_zero[2];  // one.cpp -> zero.py
-    int pipe_zero_to_one[2];  // zero.py -> one.cpp
+    // Separate pipes for each process to communicate with parent
+    int one_to_parent[2];    // one.cpp -> coupler
+    int parent_to_one[2];    // coupler -> one.cpp
+    int zero_to_parent[2];   // zero.py -> coupler
+    int parent_to_zero[2];   // coupler -> zero.py
 
     void cleanup() {
         if (process_one > 0) kill(process_one, SIGTERM);
         if (process_zero > 0) kill(process_zero, SIGTERM);
-        close(pipe_one_to_zero[0]);
-        close(pipe_one_to_zero[1]);
-        close(pipe_zero_to_one[0]);
-        close(pipe_zero_to_one[1]);
-    }
-// constructor: sets up pipes
-public:
-    ProcessManager() {
-        if (pipe(pipe_one_to_zero) < 0 || pipe(pipe_zero_to_one) < 0) {
-            throw std::runtime_error("Failed to create pipes");
-        }
+        // Close all pipe ends
+        close(one_to_parent[0]);
+        close(one_to_parent[1]);
+        close(parent_to_one[0]);
+        close(parent_to_one[1]);
+        close(zero_to_parent[0]);
+        close(zero_to_parent[1]);
+        close(parent_to_zero[0]);
+        close(parent_to_zero[1]);
     }
 
-    ~ProcessManager() {
-        cleanup();
+public:
+    ProcessManager() {
+        // Create all pipes
+        if (pipe(one_to_parent) < 0 || pipe(parent_to_one) < 0 ||
+            pipe(zero_to_parent) < 0 || pipe(parent_to_zero) < 0) {
+            throw std::runtime_error("Failed to create pipes");
+        }
     }
 
     void start_processes() {
@@ -40,12 +46,16 @@ public:
         process_one = fork();
         if (process_one == 0) {
             // Child process for one.cpp
-            dup2(pipe_one_to_zero[1], STDOUT_FILENO); 
-            dup2(pipe_zero_to_one[0], STDIN_FILENO);
+            dup2(parent_to_one[0], STDIN_FILENO);  // Read from parent
+            dup2(one_to_parent[1], STDOUT_FILENO); // Write to parent
             
             // Close unused pipe ends
-            close(pipe_one_to_zero[0]); // read end
-            close(pipe_zero_to_one[1]); // write end
+            close(one_to_parent[0]);
+            close(parent_to_one[1]);
+            close(zero_to_parent[0]);
+            close(zero_to_parent[1]);
+            close(parent_to_zero[0]);
+            close(parent_to_zero[1]);
             
             execl("./one", "one", nullptr);
             exit(1);
@@ -55,27 +65,43 @@ public:
         process_zero = fork();
         if (process_zero == 0) {
             // Child process for zero.py
-            dup2(pipe_one_to_zero[0], STDIN_FILENO);
-            dup2(pipe_zero_to_one[1], STDOUT_FILENO);
+            dup2(parent_to_zero[0], STDIN_FILENO);  // Read from parent
+            dup2(zero_to_parent[1], STDOUT_FILENO); // Write to parent
             
             // Close unused pipe ends
-            close(pipe_one_to_zero[1]); // write end
-            close(pipe_zero_to_one[0]); // read end
+            close(zero_to_parent[0]);
+            close(parent_to_zero[1]);
+            close(one_to_parent[0]);
+            close(one_to_parent[1]);
+            close(parent_to_one[0]);
+            close(parent_to_one[1]);
             
             execl("/usr/bin/python3", "python3", "zero.py", nullptr);
             exit(1);
         }
 
-        // Close unused pipe ends in parent
-        close(pipe_one_to_zero[0]);
-        close(pipe_one_to_zero[1]);
-        close(pipe_zero_to_one[0]);
-        close(pipe_zero_to_one[1]);
+        // Parent process handles communication between processes
+        std::thread relay_thread([this]() {
+            char buffer[1024];
+            while (true) {
+                // Read from one.cpp and write to zero.py
+                ssize_t bytes_read = read(one_to_parent[0], buffer, sizeof(buffer));
+                if (bytes_read <= 0) break;
+                write(parent_to_zero[1], buffer, bytes_read);
+
+                // Read from zero.py and write to one.cpp
+                bytes_read = read(zero_to_parent[0], buffer, sizeof(buffer));
+                if (bytes_read <= 0) break;
+                write(parent_to_one[1], buffer, bytes_read);
+            }
+        });
 
         // Wait for both processes
         int status;
         waitpid(process_one, &status, 0);
         waitpid(process_zero, &status, 0);
+        
+        relay_thread.join();
     }
 };
 
