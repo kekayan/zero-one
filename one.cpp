@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <random>
+#include <fstream>
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
@@ -27,6 +28,10 @@ int main(int argc, char* argv[]) {
             q_data = {time_step, dis(gen), value1};
         }
 
+        // write to one.txt
+        std::ofstream one_file("one.txt", std::ios::app);
+        one_file << q_data[0] << " " << q_data[1] << " " << q_data[2] << std::endl;
+        one_file.close();
 
         std::cout << "[" << q_data[0] << ", " << q_data[1] << ", " << q_data[2] << "]" << std::endl;
 

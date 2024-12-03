@@ -1,5 +1,6 @@
 import random
 import sys
+import time
 
 def main(one_data):
     time_step = one_data[0]
@@ -8,6 +9,7 @@ def main(one_data):
         p_data = [0,random.randint(0, 100), 0 ]
     else:
         p_data = [time_step, random.randint(0, 100), one_data[1]]
+    time.sleep(5)
     with open("zero.txt", "a") as f:
         f.write(f"{time_step} {p_data[1]} {p_data[2]}\n")
     return p_data
