@@ -87,11 +87,13 @@ public:
                 // Read from one.cpp and write to zero.py
                 ssize_t bytes_read = read(one_to_parent[0], buffer, sizeof(buffer));
                 if (bytes_read <= 0) break;
+                std::cout << "Read from one.cpp: " << std::string(buffer, bytes_read) << std::endl;
                 write(parent_to_zero[1], buffer, bytes_read);
 
                 // Read from zero.py and write to one.cpp
                 bytes_read = read(zero_to_parent[0], buffer, sizeof(buffer));
                 if (bytes_read <= 0) break;
+                std::cout << "Read from zero.py: " << std::string(buffer, bytes_read) << std::endl;
                 write(parent_to_one[1], buffer, bytes_read);
             }
         });
