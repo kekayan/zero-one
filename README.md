@@ -1,6 +1,6 @@
 ## compile
-`g++ -o one one.cpp
-g++ -o coupler coupler.cpp
-`
+`g++ -o one one.cpp`
+
+`g++ -o coupler coupler.cpp`
 ## Execute
 `./coupler `
